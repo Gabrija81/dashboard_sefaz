@@ -1,6 +1,4 @@
 import pandas as pd
-# A importação do geopandas não é mais estritamente necessária aqui, mas pode ser mantida
-# para futuras referências ou se você decidir reativar a leitura da geometria.
 import geopandas as gpd
 import streamlit as st
 
@@ -23,12 +21,16 @@ def carregar_e_processar_dados(caminho_arquivo_parquet):
         'tiqimo_VALORTOTALLOTE',
         'TAXA_PSEI_AJUSTADO',
         'TAXA_PSEI_PARC_CORR',
-        'CATEGORIA_USO', # Essencial para o filtro 'Categoria de Uso (PSEI)'
         
         # Colunas necessárias para cálculos internos (mapeamento PSEI)
         'PSEI_AJUSTADO',
         'PSEI_RECLASS_80',
         'PSEI_PARC_CORRIGIDO',
+
+        # Colunas para o novo cálculo de IPTU
+        'tiqimo_AVALIACAO',
+        'tiqimo_ALIQUOTA',
+        'COBRAR',
 
         # --- Colunas Adicionais (comentadas por padrão) ---
         # 'INSCANT',
@@ -44,12 +46,9 @@ def carregar_e_processar_dados(caminho_arquivo_parquet):
         # 'tiqimo_AREATERREN',
         # 'tiqimo_AREAEDIFICIMOVEL',
         # 'tiqimo_VALORCONST',
-        # 'tiqimo_AVALIACAO',
         # 'tiqimo_VALORTERRENOLOTE',
         # 'tiqimo_VALOREDIFICLOTE',
-        # 'tiqimo_ALIQUOTA',
         # 'PRECISAO',
-        # 'COBRAR',
         # 'TAXA_PSEI_RECLASS_80',
         # 'GLEBAS_CATEG',
         # 'CALC_NOME_CONDOMINIO',
@@ -124,9 +123,19 @@ def carregar_e_processar_dados(caminho_arquivo_parquet):
         'C_pop_2022': 'censo_pop_2022', 'C_dom_2022': 'censo_dom_2022', 'C_dd_2022': 'censo_dd_2022',
         'C_tgmca_2022': 'censo_tgmca_2022', 'C_REND_NOMIN': 'censo_renda_nom_2022', 'C_REND_SM202': 'censo_renda_sal_min_2022',
         'C_IVS': 'censo_ivs', 'C_VAR_RENDA': 'censo_variacao_renda',
-        'CATEGORIA_USO': 'categoria_uso_psei' # Mantido para funcionalidade do filtro
     }
     df = df.rename(columns=column_rename_map)
 
-    # A conversão final não é mais necessária, pois já lemos como um DataFrame do Pandas.
+    # --- CÁLCULO DO IPTU ---
+    # Garantir que as colunas numéricas não tenham valores nulos que possam quebrar o cálculo
+    df['avaliacao'] = pd.to_numeric(df['avaliacao'], errors='coerce').fillna(0)
+    df['aliquota'] = pd.to_numeric(df['aliquota'], errors='coerce').fillna(0)
+    
+    # Inicializa a coluna com zero
+    df['iptu_calculado'] = 0.0
+    # Calcula o IPTU apenas onde 'cobrar' for True. A alíquota é dividida por 100.
+    # Usamos .loc para garantir que a atribuição seja feita corretamente.
+    df.loc[df['cobrar'] == True, 'iptu_calculado'] = df['avaliacao'] * (df['aliquota'] / 100)
+
+
     return df

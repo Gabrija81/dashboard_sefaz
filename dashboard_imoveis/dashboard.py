@@ -21,7 +21,8 @@ st.write("Utilize os filtros na barra lateral para explorar os dados.")
 # Construindo o caminho para o arquivo de dados de forma robusta
 try:
     caminho_script = os.path.dirname(__file__)
-    caminho_parquet = os.path.join(caminho_script, '..', 'imoveis_relatorio.parquet')
+    # CORREÇÃO: Removido o '..' para procurar o arquivo na mesma pasta do script.
+    caminho_parquet = os.path.join(caminho_script, 'imoveis_relatorio.parquet')
     df_completo = carregar_e_processar_dados(caminho_parquet)
 except Exception:
     st.error("Erro ao construir o caminho para o arquivo de dados. Verifique a estrutura das pastas.")

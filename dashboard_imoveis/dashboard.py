@@ -86,45 +86,63 @@ else:
     diferenca = total_taxa_ajustado - total_taxa_corrigido
     
     col_comp1.metric("Total Taxa PSEI Ajustado (R$)", format_brazilian_currency(total_taxa_ajustado))
-    col_comp2.metric("Total Taxa Parc. Corrigido (R$)", format_brazilian_currency(total_taxa_corrigido))
-    col_comp3.metric("Diferença (Ajustado - Corrigido)", format_brazilian_currency(diferenca), delta_color="off")
+    # ALTERAÇÃO: Renomeando a métrica
+    col_comp2.metric("Total Taxa Reclassificada (R$)", format_brazilian_currency(total_taxa_corrigido))
+    col_comp3.metric("Diferença (Ajustado - Reclass.)", format_brazilian_currency(diferenca), delta_color="off")
 
     # --- GRÁFICOS ---
     st.header("Análises Gráficas")
     
     col_graf1, col_graf2 = st.columns(2)
 
+    # Dicionário para renomear as taxas nos gráficos
+    rename_map = {
+        'taxa_psei_ajustado': 'Taxa Ajustada',
+        'taxa_psei_parcelamento_corrigido': 'Taxa Reclassificada'
+    }
+
     with col_graf1:
-        # ALTERAÇÃO: Gráfico agora mostra a SOMA da taxa por uso
-        st.subheader("Soma da Taxa (Parc. Corrigido) por Uso")
+        # ALTERAÇÃO: Gráfico agora é comparativo
+        st.subheader("Comparativo de Taxas por Uso do Imóvel")
         if not df_filtrado.empty:
-            soma_por_uso = df_filtrado.groupby('uso_imovel')['taxa_psei_parcelamento_corrigido'].sum().sort_values(ascending=False)
+            soma_por_uso = df_filtrado.groupby('uso_imovel')[['taxa_psei_ajustado', 'taxa_psei_parcelamento_corrigido']].sum().reset_index()
+            soma_por_uso_melted = soma_por_uso.melt(id_vars='uso_imovel', var_name='Tipo de Taxa', value_name='Valor Total')
+            soma_por_uso_melted['Tipo de Taxa'] = soma_por_uso_melted['Tipo de Taxa'].map(rename_map)
+
             fig_bar_uso = px.bar(
-                soma_por_uso,
-                x=soma_por_uso.index,
-                y=soma_por_uso.values,
-                title="Soma da Taxa por Tipo de Uso",
-                labels={'x': 'Tipo de Uso', 'y': 'Soma da Taxa (R$)'}
-            )
+                soma_por_uso_melted,
+                x='uso_imovel',
+                y='Valor Total',
+                color='Tipo de Taxa',
+                barmode='group',
+                title="Soma das Taxas por Tipo de Uso",
+                labels={'uso_imovel': 'Tipo de Uso', 'Valor Total': 'Soma da Taxa (R$)'}
+            ).update_xaxes(categoryorder='total descending')
             st.plotly_chart(fig_bar_uso, use_container_width=True)
             
     with col_graf2:
-        # ALTERAÇÃO: Gráfico agora usa a taxa de parcelamento corrigido
-        st.subheader("Total da Taxa (Parc. Corrigido) por Bairro")
-        taxa_por_bairro = df_filtrado.groupby('nome_bairro')['taxa_psei_parcelamento_corrigido'].sum().sort_values(ascending=False).head(20)
+        # ALTERAÇÃO: Gráfico agora é comparativo
+        st.subheader("Comparativo de Taxas por Bairro")
+        taxa_por_bairro = df_filtrado.groupby('nome_bairro')[['taxa_psei_ajustado', 'taxa_psei_parcelamento_corrigido']].sum()
+        top_20_bairros = taxa_por_bairro.nlargest(20, 'taxa_psei_ajustado').reset_index()
+        taxa_por_bairro_melted = top_20_bairros.melt(id_vars='nome_bairro', var_name='Tipo de Taxa', value_name='Valor Total')
+        taxa_por_bairro_melted['Tipo de Taxa'] = taxa_por_bairro_melted['Tipo de Taxa'].map(rename_map)
+
         fig_bar_bairro = px.bar(
-            taxa_por_bairro,
-            x=taxa_por_bairro.index,
-            y=taxa_por_bairro.values,
+            taxa_por_bairro_melted,
+            x='nome_bairro',
+            y='Valor Total',
+            color='Tipo de Taxa',
+            barmode='group',
             title="Total Arrecadado por Bairro (Top 20)",
-            labels={'x': 'Bairro', 'y': 'Total Taxa (R$)'}
+            labels={'nome_bairro': 'Bairro', 'Valor Total': 'Total Taxa (R$)'}
         )
         st.plotly_chart(fig_bar_bairro, use_container_width=True)
             
     st.divider()
     
-    # --- GRÁFICO COMPARATIVO DE TAXAS ---
-    st.subheader("Comparativo de Taxas por Bairro")
+    # --- GRÁFICO COMPARATIVO DE TAXAS (JÁ EXISTENTE, AGORA ATUALIZADO COM NOVO NOME) ---
+    st.subheader("Visão Detalhada: Comparativo de Taxas por Bairro")
     if not df_filtrado.empty:
         df_grouped = df_filtrado.groupby('nome_bairro')[['taxa_psei_ajustado', 'taxa_psei_parcelamento_corrigido']].sum().reset_index()
         top_bairros = df_grouped.nlargest(20, 'taxa_psei_ajustado')['nome_bairro']
@@ -135,6 +153,8 @@ else:
             var_name='Tipo de Taxa', 
             value_name='Valor Total'
         )
+        # ALTERAÇÃO: Renomeando a legenda
+        df_melted['Tipo de Taxa'] = df_melted['Tipo de Taxa'].map(rename_map)
 
         fig_comp_bar = px.bar(
             df_melted,

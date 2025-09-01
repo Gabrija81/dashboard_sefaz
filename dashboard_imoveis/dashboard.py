@@ -129,8 +129,8 @@ if not df.empty:
         # BOTÃO de Download
         csv_data = convert_df_to_csv(df_filtrado)
         st.download_button(
-           label="📥 Download dos Dados Filtrados (CSV)", data=csv_data,
-           file_name='dados_filtrados.csv', mime='text/csv',
+            label="📥 Download dos Dados Filtrados (CSV)", data=csv_data,
+            file_name='dados_filtrados.csv', mime='text/csv',
         )
 else:
     st.error("Não foi possível carregar os dados. Verifique o arquivo de processamento e o caminho do Parquet.")

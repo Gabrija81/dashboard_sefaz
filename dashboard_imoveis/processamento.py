@@ -15,6 +15,9 @@ def carregar_e_processar_dados(caminho_arquivo_parquet):
         st.error(f"Arquivo de dados não encontrado no caminho: {caminho_arquivo_parquet}")
         return pd.DataFrame() # Retorna um DataFrame vazio se o arquivo não for encontrado
 
+    # remove coluna geometry
+    gdf.drop(columns=['geometry'], errors='ignore', inplace=True)
+
     # --- 2. Mapeamento de Categorias para Valores Numéricos ---
     def map_psei_category_to_numeric(category):
         """Mapeia a categoria PSEI para um valor numérico."""

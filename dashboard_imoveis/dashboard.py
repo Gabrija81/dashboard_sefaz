@@ -1,136 +1,171 @@
 import streamlit as st
 import plotly.express as px
+import os
 import pandas as pd
-import os # Importamos a biblioteca 'os' para lidar com caminhos de arquivos
-
-# Importa a função principal do seu outro arquivo
 from processamento import carregar_e_processar_dados
 
-# --- Configuração da Página ---
-st.set_page_config(layout="wide", page_title="Análise da Taxa de Lixo")
+# --- CONFIGURAÇÃO DA PÁGINA ---
+st.set_page_config(layout="wide", page_title="Análise de Imóveis e Taxas")
 
-# --- Funções Auxiliares ---
+# --- FUNÇÃO PARA DOWNLOAD ---
+# A conversão para CSV é rápida, não precisa de cache.
 def convert_df_to_csv(df):
-    """Converte o DataFrame para CSV, otimizado para o botão de download."""
-    # Como a geometria já foi removida no processamento, a função fica mais simples.
-    return df.to_csv(index=False, sep=';', decimal=',').encode('utf-8-sig')
+    """Converte um DataFrame para um arquivo CSV em memória."""
+    return df.to_csv(index=False).encode('utf-8')
 
-# --- Título do Dashboard ---
+# --- TÍTULO ---
 st.title("📊 Dashboard de Análise de Imóveis e Taxas")
-st.markdown("Utilize os filtros na barra lateral para explorar os dados.")
+st.write("Utilize os filtros na barra lateral para explorar os dados.")
 
-# --- Carregamento dos Dados ---
-# Assumindo que processamento.py agora retorna um Pandas DataFrame normal, sem geometria.
-script_dir = os.path.dirname(__file__)
-caminho_do_arquivo = os.path.join(script_dir, 'imoveis_relatorio.parquet')
-df = carregar_e_processar_dados(caminho_do_arquivo) 
+# --- CARREGAMENTO DOS DADOS ---
+# Construindo o caminho para o arquivo de dados de forma robusta
+try:
+    caminho_script = os.path.dirname(__file__)
+    caminho_parquet = os.path.join(caminho_script, '..', 'imoveis_relatorio.parquet')
+    df_completo = carregar_e_processar_dados(caminho_parquet)
+except Exception:
+    st.error("Erro ao construir o caminho para o arquivo de dados. Verifique a estrutura das pastas.")
+    df_completo = pd.DataFrame()
 
-# --- Barra Lateral de Filtros ---
+
+# --- BARRA LATERAL DE FILTROS ---
 st.sidebar.header("Filtros")
 
-if not df.empty:
-    # Filtro por Bairro
-    bairros_disponiveis = sorted(df['nome_bairro'].dropna().unique())
+# Verifica se o dataframe não está vazio para criar os filtros
+if not df_completo.empty:
+    # Filtro de Bairro
     bairros_selecionados = st.sidebar.multiselect(
         "Selecione o(s) Bairro(s):",
-        options=bairros_disponiveis,
-        default=bairros_disponiveis
+        options=sorted(df_completo['nome_bairro'].unique()),
+        default=[]
     )
 
-    # Filtro por Uso do Imóvel
-    usos_disponiveis = sorted(df['uso_imovel'].dropna().unique())
+    # Filtro de Uso do Imóvel
     usos_selecionados = st.sidebar.multiselect(
-        "Selecione o Uso do Imóvel:",
-        options=usos_disponiveis,
-        default=usos_disponiveis
+        "Selecione o(s) Uso(s) do Imóvel:",
+        options=sorted(df_completo['uso_imovel'].unique()),
+        default=[]
     )
-
-    # FILTRO: Categoria de Uso (PSEI)
-    categorias_disponiveis = sorted(df['categoria_uso_psei'].dropna().unique())
+    
+    # Filtro de Categoria de Uso (PSEI)
     categorias_selecionadas = st.sidebar.multiselect(
-        "Selecione a Categoria de Uso (PSEI):",
-        options=categorias_disponiveis,
-        default=categorias_disponiveis
+        "Selecione a(s) Categoria(s) de Uso (PSEI):",
+        options=sorted(df_completo['categoria_uso_psei'].dropna().unique()),
+        default=[]
     )
 
-    # Aplica todos os filtros ao DataFrame
-    df_filtrado = df[
-        df['nome_bairro'].isin(bairros_selecionados) &
-        df['uso_imovel'].isin(usos_selecionados) &
-        df['categoria_uso_psei'].isin(categorias_selecionadas)
-    ]
-
-    # --- Corpo Principal do Dashboard ---
-    if df_filtrado.empty:
-        st.warning("Nenhum dado encontrado para os filtros selecionados.")
+    # Lógica de filtragem
+    if bairros_selecionados:
+        df_filtrado = df_completo[df_completo['nome_bairro'].isin(bairros_selecionados)]
     else:
-        # --- Métricas Principais (KPIs) ---
-        st.subheader("Resumo dos Dados Filtrados")
+        df_filtrado = df_completo.copy()
+    
+    if usos_selecionados:
+        df_filtrado = df_filtrado[df_filtrado['uso_imovel'].isin(usos_selecionados)]
         
-        # Calculando os totais das taxas
-        total_taxa_ajustado = df_filtrado['taxa_psei_ajustado'].sum()
-        total_taxa_parc_corr = df_filtrado['taxa_psei_parcelamento_corrigido'].sum()
-        diferenca_taxas = total_taxa_ajustado - total_taxa_parc_corr
+    if categorias_selecionadas:
+        df_filtrado = df_filtrado[df_filtrado['categoria_uso_psei'].isin(categorias_selecionadas)]
 
-        # Layout das métricas em duas linhas para melhor organização
-        col1, col2 = st.columns(2)
-        col1.metric("Total de Imóveis", f"{df_filtrado.shape[0]:,}".replace(",", "."))
-        col2.metric("Valor Venal Total (R$)", f"{df_filtrado['valor_total_lote'].sum():,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
-
-        st.markdown("---")
-        st.subheader("Comparativo de Arrecadação por Cenário")
-        col3, col4, col5 = st.columns(3)
-        col3.metric("Total Taxa (PSEI Ajustado)", f"{total_taxa_ajustado:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
-        col4.metric("Total Taxa (Parc. Corrigido)", f"{total_taxa_parc_corr:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
-        col5.metric("Diferença (Ajustado - Corrigido)", f"{diferenca_taxas:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
-
-        st.markdown("---")
-
-        # --- Gráficos ---
-        st.subheader("Análises Gráficas")
-        
-        gcol1, gcol2 = st.columns(2)
-        with gcol1:
-            # Gráfico 1: Distribuição por Uso do Imóvel
-            uso_counts = df_filtrado['uso_imovel'].value_counts().reset_index()
-            fig_uso_imovel = px.pie(uso_counts, names='uso_imovel', values='count', title='Distribuição por Uso do Imóvel')
-            st.plotly_chart(fig_uso_imovel, use_container_width=True)
-
-        with gcol2:
-            # Gráfico 2: Top 10 Bairros por Arrecadação (PSEI Ajustado)
-            taxa_por_bairro = df_filtrado.groupby('nome_bairro')['taxa_psei_ajustado'].sum().nlargest(10).reset_index()
-            fig_taxa_bairro = px.bar(
-                taxa_por_bairro, x='nome_bairro', y='taxa_psei_ajustado',
-                title='Top 10 Bairros por Arrecadação (PSEI Ajustado)',
-                labels={'nome_bairro': 'Bairro', 'taxa_psei_ajustado': 'Taxa Total (R$)'}, text_auto='.2s'
-            )
-            st.plotly_chart(fig_taxa_bairro, use_container_width=True)
-            
-        # GRÁFICO: Comparativo de Taxas por Bairro
-        st.markdown("---")
-        st.subheader("Análise Comparativa de Taxas por Bairro")
-        
-        taxas_comparativas = df_filtrado.groupby('nome_bairro')[['taxa_psei_ajustado', 'taxa_psei_parcelamento_corrigido']].sum().reset_index()
-        taxas_comparativas_melted = taxas_comparativas.melt(
-            id_vars='nome_bairro', value_vars=['taxa_psei_ajustado', 'taxa_psei_parcelamento_corrigido'],
-            var_name='Tipo de Taxa', value_name='Valor Total (R$)'
-        )
-        fig_comparativa = px.bar(
-            taxas_comparativas_melted, x='nome_bairro', y='Valor Total (R$)', color='Tipo de Taxa',
-            barmode='group', title='Comparativo de Taxas por Bairro', labels={'nome_bairro': 'Bairro'}, text_auto='.2s'
-        )
-        st.plotly_chart(fig_comparativa, use_container_width=True)
-
-        # --- Tabela de Dados ---
-        st.subheader("Amostra dos Dados Detalhados")
-        st.info(f"A tabela completa contém {df_filtrado.shape[0]:,} registros. Apenas as primeiras 1.000 linhas são exibidas.")
-        st.dataframe(df_filtrado.head(1000))
-
-        # BOTÃO de Download
-        csv_data = convert_df_to_csv(df_filtrado)
-        st.download_button(
-            label="📥 Download dos Dados Filtrados (CSV)", data=csv_data,
-            file_name='dados_filtrados.csv', mime='text/csv',
-        )
 else:
-    st.error("Não foi possível carregar os dados. Verifique o arquivo de processamento e o caminho do Parquet.")
+    df_filtrado = pd.DataFrame()
+
+# --- EXIBIÇÃO DO DASHBOARD ---
+
+if df_filtrado.empty and not df_completo.empty:
+    st.info("Selecione um ou mais filtros para visualizar os dados.")
+elif df_completo.empty:
+    st.error("Não foi possível carregar os dados. Verifique a console de logs.")
+else:
+    # --- MÉTRICAS (KPIs) ---
+    st.header("Resumo dos Dados Filtrados")
+    col1, col2, col3 = st.columns(3)
+    col1.metric("Número de Imóveis", f"{df_filtrado.shape[0]:,}")
+    col2.metric("Valor Total do Lote (R$)", f"{df_filtrado['valor_total_lote'].sum():,.2f}")
+    col3.metric("Taxa PSEI Ajustado (R$)", f"{df_filtrado['taxa_psei_ajustado'].sum():,.2f}")
+
+    st.divider()
+    
+    # --- MÉTRICAS DE COMPARAÇÃO DE TAXAS ---
+    st.subheader("Comparativo entre Cenários de Taxa")
+    col_comp1, col_comp2, col_comp3 = st.columns(3)
+    
+    total_taxa_ajustado = df_filtrado['taxa_psei_ajustado'].sum()
+    total_taxa_corrigido = df_filtrado['taxa_psei_parcelamento_corrigido'].sum()
+    diferenca = total_taxa_ajustado - total_taxa_corrigido
+    
+    col_comp1.metric("Total Taxa PSEI Ajustado (R$)", f"{total_taxa_ajustado:,.2f}")
+    col_comp2.metric("Total Taxa Parc. Corrigido (R$)", f"{total_taxa_corrigido:,.2f}")
+    col_comp3.metric("Diferença (Ajustado - Corrigido)", f"{diferenca:,.2f}", delta_color="off")
+
+
+    # --- GRÁFICOS ---
+    st.header("Análises Gráficas")
+    
+    col_graf1, col_graf2 = st.columns(2)
+
+    with col_graf1:
+        st.subheader("Contagem de Imóveis por Uso")
+        if not df_filtrado.empty:
+            # ALTERAÇÃO: Gráfico de pizza para histograma (gráfico de barras)
+            fig_hist_uso = px.histogram(
+                df_filtrado,
+                x='uso_imovel',
+                title="Contagem de Imóveis por Tipo de Uso",
+                labels={'uso_imovel': 'Tipo de Uso', 'count': 'Número de Imóveis'}
+            ).update_xaxes(categoryorder='total descending') # Ordena as barras
+            st.plotly_chart(fig_hist_uso, use_container_width=True)
+            
+    with col_graf2:
+        st.subheader("Total da Taxa (PSEI Ajustado) por Bairro")
+        # Mostra o gráfico apenas se um bairro for selecionado para não poluir a tela
+        if not df_filtrado.empty and bairros_selecionados:
+            taxa_por_bairro = df_filtrado.groupby('nome_bairro')['taxa_psei_ajustado'].sum().sort_values(ascending=False).head(20)
+            fig_bar_bairro = px.bar(
+                taxa_por_bairro,
+                x=taxa_por_bairro.index,
+                y=taxa_por_bairro.values,
+                title="Total Arrecadado por Bairro (Top 20)",
+                labels={'x': 'Bairro', 'y': 'Total Taxa (R$)'}
+            )
+            st.plotly_chart(fig_bar_bairro, use_container_width=True)
+        else:
+            st.info("Selecione um ou mais bairros para exibir o gráfico de arrecadação.")
+            
+    st.divider()
+    
+    # --- GRÁFICO COMPARATIVO DE TAXAS ---
+    st.subheader("Comparativo de Taxas por Bairro")
+    if not df_filtrado.empty and bairros_selecionados:
+        df_grouped = df_filtrado.groupby('nome_bairro')[['taxa_psei_ajustado', 'taxa_psei_parcelamento_corrigido']].sum().reset_index()
+        df_melted = df_grouped.melt(
+            id_vars='nome_bairro', 
+            var_name='Tipo de Taxa', 
+            value_name='Valor Total'
+        )
+
+        fig_comp_bar = px.bar(
+            df_melted,
+            x='nome_bairro',
+            y='Valor Total',
+            color='Tipo de Taxa',
+            barmode='group',
+            title='Comparativo de Taxas por Bairro Selecionado',
+            labels={'nome_bairro': 'Bairro', 'Valor Total': 'Total Arrecadado (R$)'}
+        )
+        st.plotly_chart(fig_comp_bar, use_container_width=True)
+    else:
+        st.info("Selecione um ou mais bairros para exibir o gráfico comparativo de taxas.")
+
+
+    # --- TABELA DE DADOS ---
+    st.header("Dados Detalhados")
+    st.dataframe(df_filtrado.head(1000))
+    
+    # BOTÃO de Download
+    csv_data = convert_df_to_csv(df_filtrado)
+    st.download_button(
+        label="📥 Download dos Dados Filtrados (CSV)",
+        data=csv_data,
+        file_name='dados_filtrados.csv',
+        mime='text/csv',
+    )

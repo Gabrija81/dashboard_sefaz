@@ -26,7 +26,7 @@ st.write("Utilize os filtros na barra lateral para explorar os dados.")
 
 
 # --- CARREGAMENTO DOS DADOS A PARTIR DA URL ---
-# CORREÇÃO: Usando a URL de download direto do Google Drive.
+# CORREÇÃO DEFINITIVA: Usando a URL de download direto correta.
 URL_DO_PARQUET = "https://drive.google.com/uc?export=download&id=17eyIEl3pjx0C9-_74OhtkD5eNLxfi5aG"
 
 df_completo = carregar_e_processar_dados(URL_DO_PARQUET)
@@ -95,19 +95,23 @@ else:
     col_graf1, col_graf2 = st.columns(2)
 
     with col_graf1:
-        st.subheader("Contagem de Imóveis por Uso")
+        # ALTERAÇÃO: Gráfico agora mostra a SOMA da taxa por uso
+        st.subheader("Soma da Taxa (Parc. Corrigido) por Uso")
         if not df_filtrado.empty:
-            fig_hist_uso = px.histogram(
-                df_filtrado,
-                x='uso_imovel',
-                title="Contagem de Imóveis por Tipo de Uso",
-                labels={'uso_imovel': 'Tipo de Uso', 'count': 'Número de Imóveis'}
-            ).update_xaxes(categoryorder='total descending')
-            st.plotly_chart(fig_hist_uso, use_container_width=True)
+            soma_por_uso = df_filtrado.groupby('uso_imovel')['taxa_psei_parcelamento_corrigido'].sum().sort_values(ascending=False)
+            fig_bar_uso = px.bar(
+                soma_por_uso,
+                x=soma_por_uso.index,
+                y=soma_por_uso.values,
+                title="Soma da Taxa por Tipo de Uso",
+                labels={'x': 'Tipo de Uso', 'y': 'Soma da Taxa (R$)'}
+            )
+            st.plotly_chart(fig_bar_uso, use_container_width=True)
             
     with col_graf2:
-        st.subheader("Total da Taxa (PSEI Ajustado) por Bairro")
-        taxa_por_bairro = df_filtrado.groupby('nome_bairro')['taxa_psei_ajustado'].sum().sort_values(ascending=False).head(20)
+        # ALTERAÇÃO: Gráfico agora usa a taxa de parcelamento corrigido
+        st.subheader("Total da Taxa (Parc. Corrigido) por Bairro")
+        taxa_por_bairro = df_filtrado.groupby('nome_bairro')['taxa_psei_parcelamento_corrigido'].sum().sort_values(ascending=False).head(20)
         fig_bar_bairro = px.bar(
             taxa_por_bairro,
             x=taxa_por_bairro.index,

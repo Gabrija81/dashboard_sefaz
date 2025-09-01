@@ -21,7 +21,6 @@ st.write("Utilize os filtros na barra lateral para explorar os dados.")
 # Construindo o caminho para o arquivo de dados de forma robusta
 try:
     caminho_script = os.path.dirname(__file__)
-    # CORREÇÃO: Removido o '..' para procurar o arquivo na mesma pasta do script.
     caminho_parquet = os.path.join(caminho_script, 'imoveis_relatorio.parquet')
     df_completo = carregar_e_processar_dados(caminho_parquet)
 except Exception:
@@ -37,21 +36,24 @@ if not df_completo.empty:
     # Filtro de Bairro
     bairros_selecionados = st.sidebar.multiselect(
         "Selecione o(s) Bairro(s):",
-        options=sorted(df_completo['nome_bairro'].unique()),
+        # CORREÇÃO: Tratamento robusto para evitar erros com valores nulos ou tipos mistos
+        options=sorted([str(b) for b in df_completo['nome_bairro'].dropna().unique()]),
         default=[]
     )
 
     # Filtro de Uso do Imóvel
     usos_selecionados = st.sidebar.multiselect(
         "Selecione o(s) Uso(s) do Imóvel:",
-        options=sorted(df_completo['uso_imovel'].unique()),
+        # CORREÇÃO: Tratamento robusto para evitar erros
+        options=sorted([str(u) for u in df_completo['uso_imovel'].dropna().unique()]),
         default=[]
     )
     
     # Filtro de Categoria de Uso (PSEI)
     categorias_selecionadas = st.sidebar.multiselect(
         "Selecione a(s) Categoria(s) de Uso (PSEI):",
-        options=sorted(df_completo['categoria_uso_psei'].dropna().unique()),
+        # CORREÇÃO: Tratamento robusto para evitar erros
+        options=sorted([str(c) for c in df_completo['categoria_uso_psei'].dropna().unique()]),
         default=[]
     )
 

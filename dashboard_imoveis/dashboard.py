@@ -26,7 +26,7 @@ st.write("Utilize os filtros na barra lateral para explorar os dados.")
 
 
 # --- CARREGAMENTO DOS DADOS A PARTIR DA URL ---
-# <<< SUBSTITUA PELA SUA URL DE DOWNLOAD DIRETO DO GOOGLE DRIVE AQUI
+# CORREÇÃO: Usando a URL de download direto do Google Drive.
 URL_DO_PARQUET = "https://drive.google.com/file/d/17eyIEl3pjx0C9-_74OhtkD5eNLxfi5aG/view?usp=sharing"
 
 df_completo = carregar_e_processar_dados(URL_DO_PARQUET)

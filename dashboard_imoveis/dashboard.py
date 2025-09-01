@@ -7,10 +7,18 @@ from processamento import carregar_e_processar_dados
 # --- CONFIGURAÇÃO DA PÁGINA ---
 st.set_page_config(layout="wide", page_title="Análise de Imóveis e Taxas")
 
-# --- FUNÇÃO PARA DOWNLOAD ---
+# --- FUNÇÕES AUXILIARES DE FORMATAÇÃO ---
 def convert_df_to_csv(df):
     """Converte um DataFrame para um arquivo CSV em memória."""
     return df.to_csv(index=False).encode('utf-8')
+
+def format_brazilian_currency(number):
+    """Formata um número para o padrão de moeda brasileiro (1.234,56)."""
+    return f"{number:,.2f}".replace(',', '#').replace('.', ',').replace('#', '.')
+
+def format_brazilian_integer(number):
+    """Formata um inteiro para o padrão brasileiro (1.234)."""
+    return f"{number:,}".replace(',', '.')
 
 # --- TÍTULO ---
 st.title("📊 Dashboard de Análise de Imóveis e Taxas")
@@ -63,9 +71,9 @@ else:
     # --- MÉTRICAS (KPIs) ---
     st.header("Resumo dos Dados Filtrados")
     col1, col2, col3 = st.columns(3)
-    col1.metric("Número de Imóveis", f"{df_filtrado.shape[0]:,}")
-    col2.metric("IPTU Calculado (R$)", f"{df_filtrado['iptu_calculado'].sum():,.2f}")
-    col3.metric("Taxa PSEI Ajustado (R$)", f"{df_filtrado['taxa_psei_ajustado'].sum():,.2f}")
+    col1.metric("Número de Imóveis", format_brazilian_integer(df_filtrado.shape[0]))
+    col2.metric("IPTU Calculado (R$)", format_brazilian_currency(df_filtrado['iptu_calculado'].sum()))
+    col3.metric("Taxa PSEI Ajustado (R$)", format_brazilian_currency(df_filtrado['taxa_psei_ajustado'].sum()))
 
     st.divider()
     
@@ -77,9 +85,9 @@ else:
     total_taxa_corrigido = df_filtrado['taxa_psei_parcelamento_corrigido'].sum()
     diferenca = total_taxa_ajustado - total_taxa_corrigido
     
-    col_comp1.metric("Total Taxa PSEI Ajustado (R$)", f"{total_taxa_ajustado:,.2f}")
-    col_comp2.metric("Total Taxa Parc. Corrigido (R$)", f"{total_taxa_corrigido:,.2f}")
-    col_comp3.metric("Diferença (Ajustado - Corrigido)", f"{diferenca:,.2f}", delta_color="off")
+    col_comp1.metric("Total Taxa PSEI Ajustado (R$)", format_brazilian_currency(total_taxa_ajustado))
+    col_comp2.metric("Total Taxa Parc. Corrigido (R$)", format_brazilian_currency(total_taxa_corrigido))
+    col_comp3.metric("Diferença (Ajustado - Corrigido)", format_brazilian_currency(diferenca), delta_color="off")
 
     # --- GRÁFICOS ---
     st.header("Análises Gráficas")

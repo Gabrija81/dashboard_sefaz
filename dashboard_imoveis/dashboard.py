@@ -1,141 +1,161 @@
-import pandas as pd
-import geopandas as gpd
 import streamlit as st
+import plotly.express as px
+import os
+import pandas as pd
+from processamento import carregar_e_processar_dados
 
-# O @st.cache_data é o segredo para a performance do seu dashboard!
-# Ele garante que o processamento pesado só aconteça uma vez.
-@st.cache_data
-def carregar_e_processar_dados(caminho_arquivo_parquet):
-    """
-    Função responsável por ler o arquivo Parquet e aplicar as regras de negócio.
-    Agora otimizada para carregar apenas as colunas necessárias com a função correta.
-    """
-    print("EXECUTANDO A CARGA E PROCESSAMENTO OTIMIZADO DOS DADOS...")
+# --- CONFIGURAÇÃO DA PÁGINA ---
+st.set_page_config(layout="wide", page_title="Análise de Imóveis e Taxas")
 
-    # --- OTIMIZAÇÃO DE MEMÓRIA ---
-    # Lista de colunas a serem carregadas do arquivo Parquet.
-    colunas_necessarias = [
-        # Colunas ativas no Dashboard
-        'tiqimo_NOMEBAIRRO',
-        'tiqimo_USOIMOVEL',
-        'tiqimo_VALORTOTALLOTE',
-        'TAXA_PSEI_AJUSTADO',
-        'TAXA_PSEI_PARC_CORR',
-        
-        # Colunas necessárias para cálculos internos (mapeamento PSEI)
-        'PSEI_AJUSTADO',
-        'PSEI_RECLASS_80',
-        'PSEI_PARC_CORRIGIDO',
+# --- FUNÇÃO PARA DOWNLOAD ---
+# A conversão para CSV é rápida, não precisa de cache.
+def convert_df_to_csv(df):
+    """Converte um DataFrame para um arquivo CSV em memória."""
+    return df.to_csv(index=False).encode('utf-8')
 
-        # Colunas para o novo cálculo de IPTU
-        'tiqimo_AVALIACAO',
-        'tiqimo_ALIQUOTA',
-        'COBRAR',
+# --- TÍTULO ---
+st.title("📊 Dashboard de Análise de Imóveis e Taxas")
+st.write("Utilize os filtros na barra lateral para explorar os dados.")
 
-        # --- Colunas Adicionais (comentadas por padrão) ---
-        # 'INSCANT',
-        # 'tiqimo_NOMEREGIAO',
-        # 'tiqimo_PARCELAMEN',
-        # 'tiqimo_PROPRIETAR',
-        # 'tiqimo_COMPROMISS',
-        # 'tiqimo_ADMINISTRA',
-        # 'tiqimo_TAXACAO',
-        # 'tiqimo_DESCRICAOT',
-        # 'tiqimo_VALORVENAL',
-        # 'tiqimo_FRACAOIDEA',
-        # 'tiqimo_AREATERREN',
-        # 'tiqimo_AREAEDIFICIMOVEL',
-        # 'tiqimo_VALORCONST',
-        # 'tiqimo_VALORTERRENOLOTE',
-        # 'tiqimo_VALOREDIFICLOTE',
-        # 'PRECISAO',
-        # 'TAXA_PSEI_RECLASS_80',
-        # 'GLEBAS_CATEG',
-        # 'CALC_NOME_CONDOMINIO',
-        # 'CALC_VU_MEDIO',
-        # 'CALC_VU_MEDIO_AJUSTADO',
-        # 'CALC_AV_TERRENO_AJUSTADO',
-        # 'CALC_AV_TOTAL_AJUSTADO',
-        # 'sc_SETOR',
-        # 'sc_GRUPO',
-        # 'sc_TAMANHO_TESTADA',
-        # 'sc_TAMANHO_PROFUNDIDADE',
-        # 'sc_VALOR_PADRAO',
-        # 'sc_AREA_PADRAO',
-        # 'sc_SC_VALOR_M2',
-        # 'C_pop_2022',
-        # 'C_dom_2022',
-        # 'C_dd_2022',
-        # 'C_tgmca_2022',
-        # 'C_REND_NOMIN',
-        # 'C_REND_SM202',
-        # 'C_IVS',
-        # 'C_VAR_RENDA',
-    ]
+# --- CARREGAMENTO DOS DADOS ---
+# Construindo o caminho para o arquivo de dados de forma robusta
+try:
+    caminho_script = os.path.dirname(__file__)
+    caminho_parquet = os.path.join(caminho_script, 'imoveis_relatorio.parquet')
+    df_completo = carregar_e_processar_dados(caminho_parquet)
+except Exception:
+    st.error("Erro ao construir o caminho para o arquivo de dados. Verifique a estrutura das pastas.")
+    df_completo = pd.DataFrame()
 
-    try:
-        # CORREÇÃO: Usando pd.read_parquet, pois não estamos lendo a coluna de geometria.
-        df = pd.read_parquet(caminho_arquivo_parquet, columns=colunas_necessarias)
-    except Exception as e:
-        st.error(f"Erro ao ler o arquivo Parquet: {e}")
-        return pd.DataFrame()
 
-    # --- Mapeamento de categorias PSEI para valores numéricos ---
-    def map_psei_category_to_numeric(category):
-        mapping = {
-            'BI': 1, 'BM': 2, 'BS': 3, 'NI': 4, 'NM': 5,
-            'NS': 6, 'AI': 7, 'AM': 8, 'AS': 9
-        }
-        return mapping.get(category, None)
+# --- BARRA LATERAL DE FILTROS ---
+st.sidebar.header("Filtros")
 
-    # Atualiza a lista de colunas a serem mapeadas com base nas colunas disponíveis
-    columns_to_map = [
-        'PSEI_AJUSTADO',
-        'PSEI_RECLASS_80',
-        'PSEI_PARC_CORRIGIDO',
-    ]
+# Inicializa o dataframe filtrado com o dataframe completo
+df_filtrado = df_completo.copy()
 
-    for col in columns_to_map:
-        new_col_name = f'{col.lower()}_n'
-        if col in df.columns:
-            df[new_col_name] = df[col].apply(map_psei_category_to_numeric)
+# Verifica se o dataframe não está vazio para criar os filtros
+if not df_completo.empty:
+    # Filtro de Bairro
+    bairros_selecionados = st.sidebar.multiselect(
+        "Selecione o(s) Bairro(s):",
+        # CORREÇÃO: Tratamento robusto para evitar erros com valores nulos ou tipos mistos
+        options=sorted([str(b) for b in df_completo['nome_bairro'].dropna().unique()]),
+        default=[]
+    )
 
-    # --- Renomeando colunas para nomes mais amigáveis ---
-    column_rename_map = {
-        'INSCANT': 'inscant', 'tiqimo_NOMEREGIAO': 'nome_regiao', 'tiqimo_NOMEBAIRRO': 'nome_bairro', 'tiqimo_PARCELAMEN': 'parcelamento',
-        'tiqimo_PROPRIETAR': 'proprietario', 'tiqimo_COMPROMISS': 'compromissario', 'tiqimo_ADMINISTRA': 'administrador',
-        'tiqimo_TAXACAO': 'taxacao', 'tiqimo_DESCRICAOT': 'descricao_tax',
-        'tiqimo_USOIMOVEL': 'uso_imovel', 'tiqimo_VALORVENAL': 'valor_venal_sc',
-        'tiqimo_FRACAOIDEA': 'fracao_ideal',
-        'tiqimo_AREATERREN': 'area_terreno', 'tiqimo_AREAEDIFICIMOVEL': 'area_edificada_imovel',
-        'tiqimo_VALORCONST': 'valor_construcao', 'tiqimo_AVALIACAO': 'avaliacao', 'tiqimo_VALORTERRENOLOTE': 'valor_terreno_lote',
-        'tiqimo_VALOREDIFICLOTE': 'valor_edificacao_lote', 'tiqimo_VALORTOTALLOTE': 'valor_total_lote', 'tiqimo_ALIQUOTA': 'aliquota',
-        'PRECISAO': 'precisao', 'COBRAR': 'cobrar',
-        'PSEI_AJUSTADO': 'psei_ajustado', 'TAXA_PSEI_AJUSTADO': 'taxa_psei_ajustado',
-        'PSEI_RECLASS_80': 'psei_reclassificado_80', 'TAXA_PSEI_RECLASS_80': 'taxa_psei_reclassificado_80',
-        'GLEBAS_CATEG': 'glebas_categ',
-        'PSEI_PARC_CORRIGIDO': 'psei_parcelamento_corrigido', 'TAXA_PSEI_PARC_CORR': 'taxa_psei_parcelamento_corrigido',
-        'CALC_NOME_CONDOMINIO': 'calc_nome_condominio', 'CALC_VU_MEDIO': 'calc_vu_medio', 'CALC_VU_MEDIO_AJUSTADO': 'calc_vu_medio_ajustado',
-        'CALC_AV_TERRENO_AJUSTADO': 'calc_av_terreno_ajustado', 'CALC_AV_TOTAL_AJUSTADO': 'calc_av_total_ajustado',
-        'sc_SETOR': 'sc_setor', 'sc_GRUPO': 'sc_grupo', 'sc_TAMANHO_TESTADA': 'sc_tamanho_testada',
-        'sc_TAMANHO_PROFUNDIDADE': 'sc_tamanho_profundidade', 'sc_VALOR_PADRAO': 'sc_valor_padrao',
-        'sc_AREA_PADRAO': 'sc_area_padrao', 'sc_SC_VALOR_M2': 'sc_valor_m2',
-        'C_pop_2022': 'censo_pop_2022', 'C_dom_2022': 'censo_dom_2022', 'C_dd_2022': 'censo_dd_2022',
-        'C_tgmca_2022': 'censo_tgmca_2022', 'C_REND_NOMIN': 'censo_renda_nom_2022', 'C_REND_SM202': 'censo_renda_sal_min_2022',
-        'C_IVS': 'censo_ivs', 'C_VAR_RENDA': 'censo_variacao_renda',
-    }
-    df = df.rename(columns=column_rename_map)
+    # Filtro de Uso do Imóvel
+    usos_selecionados = st.sidebar.multiselect(
+        "Selecione o(s) Uso(s) do Imóvel:",
+        # CORREÇÃO: Tratamento robusto para evitar erros
+        options=sorted([str(u) for u in df_completo['uso_imovel'].dropna().unique()]),
+        default=[]
+    )
 
-    # --- CÁLCULO DO IPTU ---
-    # Garantir que as colunas numéricas não tenham valores nulos que possam quebrar o cálculo
-    df['avaliacao'] = pd.to_numeric(df['avaliacao'], errors='coerce').fillna(0)
-    df['aliquota'] = pd.to_numeric(df['aliquota'], errors='coerce').fillna(0)
+    # Lógica de filtragem - aplica os filtros se alguma seleção for feita
+    if bairros_selecionados:
+        df_filtrado = df_filtrado[df_filtrado['nome_bairro'].isin(bairros_selecionados)]
     
-    # Inicializa a coluna com zero
-    df['iptu_calculado'] = 0.0
-    # Calcula o IPTU apenas onde 'cobrar' for True. A alíquota é dividida por 100.
-    # Usamos .loc para garantir que a atribuição seja feita corretamente.
-    df.loc[df['cobrar'] == True, 'iptu_calculado'] = df['avaliacao'] * (df['aliquota'] / 100)
+    if usos_selecionados:
+        df_filtrado = df_filtrado[df_filtrado['uso_imovel'].isin(usos_selecionados)]
+
+# --- EXIBIÇÃO DO DASHBOARD ---
+
+if df_filtrado.empty and not df_completo.empty:
+    st.info("Nenhum dado encontrado para os filtros selecionados.")
+elif df_completo.empty:
+    st.error("Não foi possível carregar os dados. Verifique a console de logs.")
+else:
+    # --- MÉTRICAS (KPIs) ---
+    st.header("Resumo dos Dados Filtrados")
+    col1, col2, col3 = st.columns(3)
+    col1.metric("Número de Imóveis", f"{df_filtrado.shape[0]:,}")
+    # ALTERAÇÃO: Trocado 'valor_total_lote' pela nova coluna 'iptu_calculado'
+    col2.metric("IPTU Calculado (R$)", f"{df_filtrado['iptu_calculado'].sum():,.2f}")
+    col3.metric("Taxa PSEI Ajustado (R$)", f"{df_filtrado['taxa_psei_ajustado'].sum():,.2f}")
+
+    st.divider()
+    
+    # --- MÉTRICAS DE COMPARAÇÃO DE TAXAS ---
+    st.subheader("Comparativo entre Cenários de Taxa")
+    col_comp1, col_comp2, col_comp3 = st.columns(3)
+    
+    total_taxa_ajustado = df_filtrado['taxa_psei_ajustado'].sum()
+    total_taxa_corrigido = df_filtrado['taxa_psei_parcelamento_corrigido'].sum()
+    diferenca = total_taxa_ajustado - total_taxa_corrigido
+    
+    col_comp1.metric("Total Taxa PSEI Ajustado (R$)", f"{total_taxa_ajustado:,.2f}")
+    col_comp2.metric("Total Taxa Parc. Corrigido (R$)", f"{total_taxa_corrigido:,.2f}")
+    col_comp3.metric("Diferença (Ajustado - Corrigido)", f"{diferenca:,.2f}", delta_color="off")
 
 
-    return df
+    # --- GRÁFICOS ---
+    st.header("Análises Gráficas")
+    
+    col_graf1, col_graf2 = st.columns(2)
+
+    with col_graf1:
+        st.subheader("Contagem de Imóveis por Uso")
+        if not df_filtrado.empty:
+            # ALTERAÇÃO: Gráfico de pizza para histograma (gráfico de barras)
+            fig_hist_uso = px.histogram(
+                df_filtrado,
+                x='uso_imovel',
+                title="Contagem de Imóveis por Tipo de Uso",
+                labels={'uso_imovel': 'Tipo de Uso', 'count': 'Número de Imóveis'}
+            ).update_xaxes(categoryorder='total descending') # Ordena as barras
+            st.plotly_chart(fig_hist_uso, use_container_width=True)
+            
+    with col_graf2:
+        st.subheader("Total da Taxa (PSEI Ajustado) por Bairro")
+        # Mostra o gráfico com todos os bairros por padrão, e filtra se selecionado
+        taxa_por_bairro = df_filtrado.groupby('nome_bairro')['taxa_psei_ajustado'].sum().sort_values(ascending=False).head(20)
+        fig_bar_bairro = px.bar(
+            taxa_por_bairro,
+            x=taxa_por_bairro.index,
+            y=taxa_por_bairro.values,
+            title="Total Arrecadado por Bairro (Top 20)",
+            labels={'x': 'Bairro', 'y': 'Total Taxa (R$)'}
+        )
+        st.plotly_chart(fig_bar_bairro, use_container_width=True)
+            
+    st.divider()
+    
+    # --- GRÁFICO COMPARATIVO DE TAXAS ---
+    st.subheader("Comparativo de Taxas por Bairro")
+    if not df_filtrado.empty:
+        df_grouped = df_filtrado.groupby('nome_bairro')[['taxa_psei_ajustado', 'taxa_psei_parcelamento_corrigido']].sum().reset_index()
+        # Pega apenas os top 20 bairros para não poluir o gráfico
+        top_bairros = df_grouped.nlargest(20, 'taxa_psei_ajustado')['nome_bairro']
+        df_grouped = df_grouped[df_grouped['nome_bairro'].isin(top_bairros)]
+        
+        df_melted = df_grouped.melt(
+            id_vars='nome_bairro', 
+            var_name='Tipo de Taxa', 
+            value_name='Valor Total'
+        )
+
+        fig_comp_bar = px.bar(
+            df_melted,
+            x='nome_bairro',
+            y='Valor Total',
+            color='Tipo de Taxa',
+            barmode='group',
+            title='Comparativo de Taxas por Bairro (Top 20 por Taxa Ajustada)',
+            labels={'nome_bairro': 'Bairro', 'Valor Total': 'Total Arrecadado (R$)'}
+        )
+        st.plotly_chart(fig_comp_bar, use_container_width=True)
+
+
+    # --- TABELA DE DADOS ---
+    st.header("Dados Detalhados")
+    st.dataframe(df_filtrado.head(1000))
+    
+    # BOTÃO de Download
+    csv_data = convert_df_to_csv(df_filtrado)
+    st.download_button(
+        label="📥 Download dos Dados Filtrados (CSV)",
+        data=csv_data,
+        file_name='dados_filtrados.csv',
+        mime='text/csv',
+    )

@@ -1,4 +1,6 @@
 import pandas as pd
+# A importação do geopandas não é mais estritamente necessária aqui, mas pode ser mantida
+# para futuras referências ou se você decidir reativar a leitura da geometria.
 import geopandas as gpd
 import streamlit as st
 
@@ -8,7 +10,7 @@ import streamlit as st
 def carregar_e_processar_dados(caminho_arquivo_parquet):
     """
     Função responsável por ler o arquivo Parquet e aplicar as regras de negócio.
-    Agora otimizada para carregar apenas as colunas necessárias.
+    Agora otimizada para carregar apenas as colunas necessárias com a função correta.
     """
     print("EXECUTANDO A CARGA E PROCESSAMENTO OTIMIZADO DOS DADOS...")
 
@@ -73,8 +75,8 @@ def carregar_e_processar_dados(caminho_arquivo_parquet):
     ]
 
     try:
-        # Lemos o arquivo Parquet especificando apenas as colunas que queremos.
-        gdf = gpd.read_parquet(caminho_arquivo_parquet, columns=colunas_necessarias)
+        # CORREÇÃO: Usando pd.read_parquet, pois não estamos lendo a coluna de geometria.
+        df = pd.read_parquet(caminho_arquivo_parquet, columns=colunas_necessarias)
     except Exception as e:
         st.error(f"Erro ao ler o arquivo Parquet: {e}")
         return pd.DataFrame()
@@ -96,8 +98,8 @@ def carregar_e_processar_dados(caminho_arquivo_parquet):
 
     for col in columns_to_map:
         new_col_name = f'{col.lower()}_n'
-        if col in gdf.columns:
-            gdf[new_col_name] = gdf[col].apply(map_psei_category_to_numeric)
+        if col in df.columns:
+            df[new_col_name] = df[col].apply(map_psei_category_to_numeric)
 
     # --- Renomeando colunas para nomes mais amigáveis ---
     column_rename_map = {
@@ -124,10 +126,7 @@ def carregar_e_processar_dados(caminho_arquivo_parquet):
         'C_IVS': 'censo_ivs', 'C_VAR_RENDA': 'censo_variacao_renda',
         'CATEGORIA_USO': 'categoria_uso_psei' # Mantido para funcionalidade do filtro
     }
-    gdf = gdf.rename(columns=column_rename_map)
+    df = df.rename(columns=column_rename_map)
 
-    # Convertendo para DataFrame do Pandas para remover a complexidade da geometria.
-    df = pd.DataFrame(gdf)
-
+    # A conversão final não é mais necessária, pois já lemos como um DataFrame do Pandas.
     return df
-

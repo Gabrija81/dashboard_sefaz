@@ -88,8 +88,9 @@ if not df.empty:
         st.plotly_chart(fig_taxa_bairro, use_container_width=True)
 
         # --- Tabela de Dados ---
-        st.subheader("Dados Detalhados")
-        st.dataframe(df_filtrado)
+        st.subheader("Amostra dos Dados Detalhados")
+        st.info(f"A tabela completa contém {df_filtrado.shape[0]:,} registros. Para evitar lentidão no navegador, apenas as primeiras 1.000 linhas são exibidas abaixo.")
+        st.dataframe(df_filtrado.head(1000))
 
 else:
     st.error("Não foi possível carregar os dados. Verifique o arquivo de processamento e o caminho do Parquet.")

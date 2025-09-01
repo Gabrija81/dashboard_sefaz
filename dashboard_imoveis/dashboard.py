@@ -10,7 +10,7 @@ from processamento import carregar_e_processar_dados
 st.set_page_config(layout="wide", page_title="Análise da Taxa de Lixo")
 
 # --- Funções Auxiliares ---
-@st.cache_data
+# REMOVIDO o @st.cache_data daqui, pois ele não consegue lidar com a coluna de geometria.
 def convert_df_to_csv(df):
     """Converte o DataFrame para CSV, otimizado para o botão de download."""
     # Garante que a geometria não seja exportada para o CSV
@@ -135,4 +135,3 @@ if not df.empty:
         )
 else:
     st.error("Não foi possível carregar os dados. Verifique o arquivo de processamento e o caminho do Parquet.")
-

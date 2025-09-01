@@ -1,6 +1,6 @@
 import geopandas as gpd
 
-gdf = gpd.read_parquet('IMOVEIS_RELATORIO.parquet')
+gdf = gpd.read_parquet('imoveis_relatorio.parquet')
 print(gdf.columns)
 def map_psei_category_to_numeric(category):
     """Maps PSEI category string to a numeric value."""

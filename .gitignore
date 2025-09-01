@@ -6,6 +6,8 @@ dashboard_imoveis/.venv/
 Ignorar as pastas de cache do Python
 dashboard_imoveis/pycache/
 pycache/
+dashboard_imoveis/__pycache__/
+__pycache__/
 *.pyc
 
 Ignorar arquivos de sistema do macOS e Windows

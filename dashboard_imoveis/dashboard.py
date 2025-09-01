@@ -1,6 +1,7 @@
 import streamlit as st
 import plotly.express as px
 import pandas as pd
+import os # Importamos a biblioteca 'os' para lidar com caminhos de arquivos
 
 # Importa a função principal do seu outro arquivo
 from processamento import carregar_e_processar_dados
@@ -13,10 +14,16 @@ st.set_page_config(layout="wide", page_title="Análise da Taxa de Lixo")
 st.title("📊 Dashboard de Análise de Imóveis e Taxas")
 st.markdown("Utilize os filtros na barra lateral para explorar os dados.")
 
-# --- Carregamento dos Dados ---
-# O Streamlit executará a função pesada apenas uma vez graças ao @st.cache_data
-# O nome do arquivo deve ser o mesmo que você enviou para o GitHub
-df = carregar_e_processar_dados('imoveis_relatorio.parquet')
+# --- Carregamento dos Dados (COM A CORREÇÃO) ---
+# Construímos um caminho que sempre funcionará, não importa de onde o script seja executado.
+# 1. Pega o diretório onde o script 'dashboard.py' está localizado.
+script_dir = os.path.dirname(__file__)
+# 2. Junta esse diretório com o nome do arquivo de dados.
+caminho_do_arquivo = os.path.join(script_dir, 'imoveis_relatorio.parquet')
+
+# 3. Passa o caminho completo e correto para a função de carregamento.
+df = carregar_e_processar_dados(caminho_do_arquivo)
+
 
 # --- Barra Lateral de Filtros ---
 st.sidebar.header("Filtros")

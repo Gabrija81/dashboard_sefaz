@@ -32,8 +32,8 @@ if not gdf.empty:
     bairros_disponiveis = sorted(gdf['nome_bairro'].dropna().unique())
     bairros_selecionados = st.sidebar.multiselect(
         "Selecione o(s) Bairro(s):",
-        options=bairros_disponis,
-        default=bairros_disponis
+        options=bairros_disponiveis,
+        default=bairros_disponiveis
     )
 
     # Filtro por Uso do Imóvel
